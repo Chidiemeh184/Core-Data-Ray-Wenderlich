@@ -7,11 +7,12 @@
 //
 
 import UIKit
+import CoreData
 
 class ViewController: UIViewController {
 
     
-    var names : [String] = []
+    var people : [NSManagedObject] = []
     
     @IBOutlet weak var tableView: UITableView!
     
@@ -23,6 +24,32 @@ class ViewController: UIViewController {
         
     }
 
+    //This will fetch data from persistence container and load it
+    //for us to see
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        
+        //1 
+        guard let appDelegate = UIApplication.shared.delegate as? AppDelegate else {
+            return
+        }
+        
+        let managedContext = appDelegate.persistentContainer.viewContext
+        
+        //2
+        let fetchRequest = NSFetchRequest<NSManagedObject>(entityName: "Person")
+        
+        //3
+        do {
+            people = try managedContext.fetch(fetchRequest)
+        }catch let error as NSError {
+            print("Could not fetch. \(error), \(error.userInfo)")
+        }
+    }
+    
+    
+    
+    
     //Adds name to the table
     @IBAction func addName(_ sender: UIBarButtonItem) {
         
@@ -35,14 +62,12 @@ class ViewController: UIViewController {
             guard let textField = alert.textFields?.first, let nameToSave = textField.text else {
                 return
             }
-            
-            self.names.append(nameToSave)
+            self.save(name: nameToSave)
             self.tableView.reloadData()
         }
         
         //Create a Cancel action
         let cancelAction = UIAlertAction(title: "Cancel", style: .cancel, handler: nil)
-        
         
         alert.addTextField()
         alert.addAction(saveAction)
@@ -51,23 +76,94 @@ class ViewController: UIViewController {
         present(alert, animated: true, completion: nil)
     }
     
-}
+    
+    
+    //Saves data to persistence
+    func save(name: String){
+        
+        guard let appDelegate = UIApplication.shared.delegate as? AppDelegate else {
+            return
+        }
+        
+        // 1
+        let managedContext = appDelegate.persistentContainer.viewContext
+        
+        //2
+        let entity = NSEntityDescription.entity(forEntityName: "Person", in: managedContext)!
+        
+        let person = NSManagedObject(entity: entity, insertInto: managedContext)
+        
+        //3
+        //We needed to get this person ManagedObject to we can
+        //pass it the name to store it in its "name" attributes
+        
+        person.setValue(name, forKey: "name") //KVC
+        
+        //4 Then we save
+        
+        do {
+            //This is where we are really saving the thing to core data
+            //Because the rest is just for our views so there is need to fetch
+            //it back when we want to show it. The array of people is not persistence
+            try managedContext.save()
+            people.append(person) //add person to people array
+        } catch let error as NSError {
+            print("Could not save. \(error), \(error.userInfo)")
+        }
+        
+        
+    }
+    
+    
+}//End ViewController
+
+
 
 
 // MARK: - UITableViewDataSource
 extension ViewController: UITableViewDataSource {
     
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return names.count
+        return people.count
     }
     
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         
+        //Get a single person entity
+        let person = people[indexPath.row]
+        
+        
         let cell = tableView.dequeueReusableCell(withIdentifier: "Cell", for: indexPath)
         
-        cell.textLabel?.text = names[indexPath.row]
+        /*
+         This is Key value Coding for accessing objects and makes it behave like dictionary at run time
+         KVC can only be used on any objects that inherits from NSObject
+        */
+        cell.textLabel?.text = person.value(forKey: "name") as? String
         return cell
     }
     
     
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
